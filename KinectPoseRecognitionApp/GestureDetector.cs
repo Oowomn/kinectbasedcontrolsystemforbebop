@@ -31,24 +31,37 @@ namespace KinectPoseRecognitionApp
             _backwardThreshold = backwardThreshold;
         }
 
+        public void updateThresholds(double leftThreshold, double rightThreshold, double upThreshold, double downThreshold, double forwardThreshold, double backwardThreshold)
+        {
+            _leftThreshold = leftThreshold;
+            _rightThreshold = rightThreshold;
+            _upThreshold = upThreshold;
+            _downThreshold = downThreshold;
+            _forwardThreshold = forwardThreshold;
+            _backwardThreshold = backwardThreshold;
+        }
+
         public void detect(Body body)
         {
-            GestureRecongizedArgs args = new GestureRecongizedArgs();
-            args.leftHandGesture = new Gesture
+            if (body != null)
             {
-                forwardBackwardGestureArgs = compareForwardBackward(body.Joints[JointType.ShoulderLeft], body.Joints[JointType.ElbowLeft]),
-                upwardDownwardGestureArgs = compareUpDown(body.Joints[JointType.ElbowLeft], body.Joints[JointType.WristLeft]),
-                leftRightGestureArgs = compareLeftRight(body.Joints[JointType.ElbowLeft], body.Joints[JointType.WristLeft])
-            };
+                GestureRecongizedArgs args = new GestureRecongizedArgs();
+                args.leftHandGesture = new Gesture
+                {
+                    forwardBackwardGestureArgs = compareForwardBackward(body.Joints[JointType.ShoulderLeft], body.Joints[JointType.ElbowLeft]),
+                    upwardDownwardGestureArgs = compareUpDown(body.Joints[JointType.ElbowLeft], body.Joints[JointType.WristLeft]),
+                    leftRightGestureArgs = compareLeftRight(body.Joints[JointType.ElbowLeft], body.Joints[JointType.WristLeft])
+                };
 
-            args.rightHandGesture = new Gesture
-            {
-                forwardBackwardGestureArgs = compareForwardBackward(body.Joints[JointType.ShoulderRight], body.Joints[JointType.ElbowRight]),
-                upwardDownwardGestureArgs = compareUpDown(body.Joints[JointType.ElbowRight], body.Joints[JointType.WristRight]),
-                leftRightGestureArgs = compareLeftRight(body.Joints[JointType.ElbowRight], body.Joints[JointType.WristRight])
-            };
+                args.rightHandGesture = new Gesture
+                {
+                    forwardBackwardGestureArgs = compareForwardBackward(body.Joints[JointType.ShoulderRight], body.Joints[JointType.ElbowRight]),
+                    upwardDownwardGestureArgs = compareUpDown(body.Joints[JointType.ElbowRight], body.Joints[JointType.WristRight]),
+                    leftRightGestureArgs = compareLeftRight(body.Joints[JointType.ElbowRight], body.Joints[JointType.WristRight])
+                };
 
-            GestureRecongized.Invoke(this, args);
+                GestureRecongized.Invoke(this, args);
+            }
 
         }
 
