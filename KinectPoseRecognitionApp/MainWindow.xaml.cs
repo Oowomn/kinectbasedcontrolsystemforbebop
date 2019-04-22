@@ -214,7 +214,7 @@ namespace KinectPoseRecognitionApp
             _gestureDetector.GestureRecongized += _gestureDetector_GestureRecongized;
             try
             {
-                _flightController = new FlightController("ws://192.168.1.1:9090");
+                _flightController = new FlightController("ws://192.168.42.3:9090");
             }
             catch (Exception err)
             {

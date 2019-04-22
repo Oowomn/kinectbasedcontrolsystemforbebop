@@ -16,9 +16,9 @@ namespace KinectPoseRecognitionApp
 {
     public enum FlightOperation { landing, takeOff, forward, backward, up, down, left, right, rotateLeft, rotateRight, none}
     public enum FlightOperationMode { idle, navigate, landingOrTakingOff}
-
     class FlightController
     {
+        public event EventHandler<FlightCameraVideoFrameReceivedArgs> CameraFrameReceived;
         string _connectionUri;
         private bool _isConnected = false;
         public bool isConnected { get { return _isConnected; } }
@@ -47,6 +47,7 @@ namespace KinectPoseRecognitionApp
                 _cts = new CancellationTokenSource();
                 _md = Connect(new Uri(_connectionUri), _cts);
                 _isConnected = true;
+                Subscribe(_md);
             }
         }
 
@@ -202,6 +203,15 @@ namespace KinectPoseRecognitionApp
             }
         }
 
+        static void Subscribe(IRosbridgeMessageDispatcher messageDispatcher)
+        {
+            RosSubscriber subscriber = new RosSubscriber(messageDispatcher, "/bebop/image_raw", "sensor_msgs/Image");
+
+            subscriber.RosMessageReceived += (s, e) => { Console.WriteLine(e.RosMessage); };
+
+            subscriber.SubscribeAsync();
+        }
+
         static IRosbridgeMessageDispatcher Connect(Uri webSocketAddress, CancellationTokenSource cancellationTokenSource)
         {
             ISocket socket = new Socket(new ClientWebSocket(), webSocketAddress, cancellationTokenSource);
@@ -212,5 +222,10 @@ namespace KinectPoseRecognitionApp
 
             return messageDispatcher;
         }
+    }
+
+    public class FlightCameraVideoFrameReceivedArgs
+    {
+        public Byte[] frame;
     }
 }
