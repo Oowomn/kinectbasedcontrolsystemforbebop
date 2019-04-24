@@ -190,12 +190,8 @@
                         </TextBlock>
                         <ComboBox Margin="8" materialDesign:HintAssist.Hint="UAV Mode" x:Name="uavModeCombo"
                                   Style="{StaticResource MaterialDesignFloatingHintComboBox}" SelectedValue="{Binding uavMode,Mode=TwoWay}">
-                            <ComboBoxItem >
-                                Single
-                            </ComboBoxItem>
-                            <ComboBoxItem>
-                                Two
-                            </ComboBoxItem>
+                            <ComboBoxItem Content="Single" IsSelected="True"/>
+                            <ComboBoxItem Content="Two"/>
                         </ComboBox>
                         <TextBox
                                     Margin="2"
@@ -206,16 +202,17 @@
                                     Text="{Binding uav1Address,Mode=OneWayToSource}"
                                     FontSize="16" />
                         <TextBox
+                            x:Name="tbUav2Addr"
                                     Margin="2"
                                     materialDesign:HintAssist.Hint="UAV2 WS"
                                     materialDesign:TextFieldAssist.TextBoxViewMargin="1 0 1 0"
                                     materialDesign:HintAssist.FloatingScale="0.6"
                                     Style="{StaticResource MaterialDesignFloatingHintTextBox}"
                                     Text="{Binding uav2Address,Mode=OneWayToSource}"
-                                    IsEnabled="{Binding isTwinMode,Mode=OneWay}"
+                                    IsEnabled="False"
                                     FontSize="16" />
-                        <Button Content="Connect"/>
-                        <Button Content="Disconnect" Background="Red"/>
+                        <Button Content="Connect" x:Name="btnConnect" Click="BtnConnect_Click"/>
+                        <Button Content="Disconnect" Background="Red" x:Name="btnDisconnect" Click="BtnDisconnect_Click" IsEnabled="False"/>
                     </StackPanel>
                 </materialDesign:Card>
                 <materialDesign:Card Margin="2">

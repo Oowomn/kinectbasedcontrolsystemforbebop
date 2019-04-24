@@ -52,6 +52,7 @@ namespace KinectPoseRecognitionApp
                 else
                 {
                     return "Not connected";
+                
                 }
             } }
 
@@ -110,14 +111,6 @@ namespace KinectPoseRecognitionApp
             }
         }
 
-        public bool isTwinMode
-        {
-            get
-            {
-                return _uavMode == "Two";
-            }
-        }
-
         private string _uavMode = "Single";
         public string uavMode
         {
@@ -133,15 +126,7 @@ namespace KinectPoseRecognitionApp
                     return;
                 }
                 _uavMode = i.Content.ToString();
-                if(i.Content.ToString() == "Two")
-                {
-                    SwitchUAVMode(2);
-                }
-                else
-                {
-                    SwitchUAVMode(1);
-                }
-                
+                tbUav2Addr.IsEnabled = _uavMode == "Two";
             }
         }
 
@@ -168,6 +153,14 @@ namespace KinectPoseRecognitionApp
             set
             {
                 _uav2Address = value;
+            }
+        }
+
+        public bool canConnect
+        {
+            get
+            {
+                return _flightController == null;
             }
         }
 
@@ -212,15 +205,6 @@ namespace KinectPoseRecognitionApp
             _sensor.IsAvailableChanged += _sensor_IsAvailableChanged;
             _gestureDetector = new GestureDetector(0.15, 0.15, 0.1, 0.15, 0.15, 0.1);
             _gestureDetector.GestureRecongized += _gestureDetector_GestureRecongized;
-            try
-            {
-                _flightController = new FlightController("ws://192.168.42.3:9090");
-            }
-            catch (Exception err)
-            {
-                log("Fail to init flight controller with the ws uri");
-                log("Error Message: " + err.Message);
-            }
             //try
             //{
             //    if (_flightController != null) _flightController.Connect();
@@ -248,27 +232,6 @@ namespace KinectPoseRecognitionApp
                 //kinect_status.Text = "Not connected";
             }
 
-        }
-
-        private void SwitchUAVMode(int numOfUAV)
-        {
-            if (numOfUAV == 1)
-            {
-                // single mode
-                try
-                {
-                    _flightController = new FlightController(_uav1Address);
-                }
-                catch (Exception e)
-                {
-                    log("Fail to switch flight controller with the ws uri");
-                    log(e.Message);
-                }
-            }
-            else
-            {
-                //two uav mode
-            }
         }
 
         private void _sensor_IsAvailableChanged(object sender, IsAvailableChangedEventArgs e)
@@ -355,6 +318,86 @@ namespace KinectPoseRecognitionApp
         {
             MessageConsole.Text = MessageConsole.Text + Environment.NewLine + message;
             MessageConsoleSroll.ScrollToBottom();
+        }
+
+        private void BtnConnect_Click(object sender, RoutedEventArgs e)
+        {
+            if(_flightController != null && _flightController.isConnected)
+            {
+                log("You should disconnect the previous connect before init a new connection");
+                return;
+            }
+            else
+            {
+                if (_uavMode == "Single")
+                {
+                    if(_uav1Address.Length > 0 && _uav1Address.StartsWith("ws://"))
+                    {
+                        _flightController = new FlightController();
+                        try
+                        {
+                            _flightController.Connect(_uav1Address);
+                            _flightController.FlightModeChanged += _flightController_FlightModeChanged;
+                            btnConnect.IsEnabled = false;
+                            btnDisconnect.IsEnabled = true;
+                        }
+                        catch (Exception error)
+                        {
+                            log("Flight connection error");
+                            log(error.Message);
+                            _flightController = null;
+                            _flightController.FlightModeChanged -= _flightController_FlightModeChanged;
+                        }
+                    }
+                    else
+                    {
+                        log("UAV1 Connection URL is not valid");
+                    }
+                }else if (_uavMode == "Two")
+                {
+                    if (_uav1Address.Length > 0 && _uav1Address.StartsWith("ws://") && _uav2Address.Length > 0 && _uav2Address.StartsWith("ws://"))
+                    {
+                        log("Not Support yet");
+                    }
+                    else
+                    {
+                        log("UAV1/UAV2 Connection URL is not valid");
+                    }
+                }
+                else
+                {
+                    
+                }
+                
+            }
+        }
+
+        private void _flightController_FlightModeChanged(object sender, FlightModeChangedArgs e)
+        {
+            flightStatus.Text = e.to.ToString();
+        }
+
+        private void BtnDisconnect_Click(object sender, RoutedEventArgs e)
+        {
+            if (_flightController != null && _flightController.isConnected)
+            {
+                try
+                {
+                    _flightController.Disconnect();
+                    _flightController.FlightModeChanged -= _flightController_FlightModeChanged;
+                    flightStatus.Text = "Not Connected";
+                    btnConnect.IsEnabled = true;
+                    btnDisconnect.IsEnabled = false;
+                }
+                catch (Exception error)
+                {
+                    log("Flight disconnect fail. Force disconnected");
+                    log(error.Message);
+                    _flightController.FlightModeChanged -= _flightController_FlightModeChanged;
+                    _flightController = null;
+                    flightStatus.Text = "Not Connected";
+                }
+            }
         }
     }
 }

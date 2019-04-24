@@ -19,6 +19,7 @@ namespace KinectPoseRecognitionApp
     class FlightController
     {
         public event EventHandler<FlightCameraVideoFrameReceivedArgs> CameraFrameReceived;
+        public event EventHandler<FlightModeChangedArgs> FlightModeChanged;
         string _connectionUri;
         private bool _isConnected = false;
         public bool isConnected { get { return _isConnected; } }
@@ -32,18 +33,15 @@ namespace KinectPoseRecognitionApp
         private CancellationTokenSource _cts;
         private IRosbridgeMessageDispatcher _md;
         private bool _isLanded = true;
-        public FlightController(string conn)
+        public FlightController()
         {
-            if(conn != null && conn.Length != 0)
-            {
-                _connectionUri = conn;
-            }
         }
 
-        public void Connect()
+        public void Connect(string conn)
         {
-            if (_connectionUri != null && _connectionUri.Length != 0 && !_isConnected)
+            if (conn != null && conn.Length != 0 && !_isConnected)
             {
+                _connectionUri = conn;
                 _cts = new CancellationTokenSource();
                 _md = Connect(new Uri(_connectionUri), _cts);
                 _isConnected = true;
@@ -60,39 +58,50 @@ namespace KinectPoseRecognitionApp
             }
         }
 
-        public void SwitchMode(FlightOperationMode mode)
+        private void SwitchMode(FlightOperationMode newMode)
         {
-            if (_isConnected)
-            {
-                _mode = mode;
-            }
+            FlightModeChangedArgs args = new FlightModeChangedArgs();
+            args.from = _mode;
+            args.to = newMode;
+            FlightModeChanged.Invoke(this, args);
+            _mode = newMode;
         }
 
         public async void TranslateGestureToFlightOperation(GestureRecongizedArgs args)
         {
+            if (!_isConnected)
+                return;
+
             if (_mode == FlightOperationMode.landingOrTakingOff)
             {
                 return;
             }
 
-            if(_mode == FlightOperationMode.idle)
+            if (_mode == FlightOperationMode.idle)
             {
                 if (args.rightHandGesture.upwardDownwardGestureArgs == UpwardDownwardGesture.Down && !_isLanded)
                 {
-                    _mode = FlightOperationMode.landingOrTakingOff;
+                    SwitchMode(FlightOperationMode.landingOrTakingOff);
                     await landing();
                     _isLanded = true;
-                    _mode = FlightOperationMode.idle;
+                    SwitchMode(FlightOperationMode.idle);
                 }
                 else if (args.rightHandGesture.upwardDownwardGestureArgs == UpwardDownwardGesture.Up && _isLanded)
                 {
-                    _mode = FlightOperationMode.landingOrTakingOff;
+                    SwitchMode(FlightOperationMode.landingOrTakingOff);
                     await takeOff();
                     _isLanded = false;
-                    _mode = FlightOperationMode.idle;
+                    SwitchMode(FlightOperationMode.idle);
                 }
             }
 
+            if (args.rightHandGesture.leftRightGestureArgs == LeftRightGesture.Right)
+            {
+                if (_mode == FlightOperationMode.idle)
+                    SwitchMode(FlightOperationMode.navigate);
+                else
+                    SwitchMode(FlightOperationMode.idle);
+            }
 
             if (_mode == FlightOperationMode.navigate)
             {
@@ -227,5 +236,11 @@ namespace KinectPoseRecognitionApp
     public class FlightCameraVideoFrameReceivedArgs
     {
         public Byte[] frame;
+    }
+
+    public class FlightModeChangedArgs
+    {
+        public FlightOperationMode from;
+        public FlightOperationMode to;
     }
 }
