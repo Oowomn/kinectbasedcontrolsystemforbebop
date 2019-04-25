@@ -320,7 +320,7 @@ namespace KinectPoseRecognitionApp
             MessageConsoleSroll.ScrollToBottom();
         }
 
-        private void BtnConnect_Click(object sender, RoutedEventArgs e)
+        private async void BtnConnect_Click(object sender, RoutedEventArgs e)
         {
             if(_flightController != null && _flightController.isConnected)
             {
@@ -333,20 +333,29 @@ namespace KinectPoseRecognitionApp
                 {
                     if(_uav1Address.Length > 0 && _uav1Address.StartsWith("ws://"))
                     {
-                        _flightController = new FlightController();
+                        _flightController = new FlightController(this, _uav1Address);
                         try
                         {
-                            _flightController.Connect(_uav1Address);
-                            _flightController.FlightModeChanged += _flightController_FlightModeChanged;
                             btnConnect.IsEnabled = false;
+                            flightStatus.Text = "Connecting...";
+                            _flightController.FlightModeChanged += _flightController_FlightModeChanged;
+                            await _flightController.Connect();
                             btnDisconnect.IsEnabled = true;
                         }
                         catch (Exception error)
                         {
                             log("Flight connection error");
                             log(error.Message);
-                            _flightController = null;
-                            _flightController.FlightModeChanged -= _flightController_FlightModeChanged;
+                            if (_flightController != null)
+                            {
+                                flightStatus.Text = "Not Connected";
+                                await _flightController.ClearUp();
+                                _flightController.FlightModeChanged -= _flightController_FlightModeChanged;
+                                _flightController = null;
+                                btnConnect.IsEnabled = true;
+                                btnDisconnect.IsEnabled = false;
+                            }
+                            
                         }
                     }
                     else
@@ -377,25 +386,30 @@ namespace KinectPoseRecognitionApp
             flightStatus.Text = e.to.ToString();
         }
 
-        private void BtnDisconnect_Click(object sender, RoutedEventArgs e)
+        private async void BtnDisconnect_Click(object sender, RoutedEventArgs e)
         {
             if (_flightController != null && _flightController.isConnected)
             {
                 try
                 {
-                    _flightController.Disconnect();
+                    await _flightController.Disconnect();
                     _flightController.FlightModeChanged -= _flightController_FlightModeChanged;
+                    _flightController = null;
                     flightStatus.Text = "Not Connected";
                     btnConnect.IsEnabled = true;
                     btnDisconnect.IsEnabled = false;
+
+                    log("[Flight Connection] Disconnected");
                 }
                 catch (Exception error)
                 {
-                    log("Flight disconnect fail. Force disconnected");
+                    log("[Flight Connection]Flight disconnect fail. Force disconnected");
                     log(error.Message);
                     _flightController.FlightModeChanged -= _flightController_FlightModeChanged;
                     _flightController = null;
                     flightStatus.Text = "Not Connected";
+                    btnConnect.IsEnabled = true;
+                    btnDisconnect.IsEnabled = false;
                 }
             }
         }

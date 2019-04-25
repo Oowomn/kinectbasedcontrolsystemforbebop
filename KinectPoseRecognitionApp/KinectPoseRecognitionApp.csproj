@@ -72,13 +72,11 @@
     <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.12.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
-    <Reference Include="RosbridgeNet.RosbridgeClient.Common, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\RosbridgeNet.RosbridgeClient.Common.1.2.0\lib\netstandard1.3\RosbridgeNet.RosbridgeClient.Common.dll</HintPath>
-      <Private>True</Private>
+    <Reference Include="rosbridge_client_common, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\rosbridge.client.common.1.0.0\lib\portable45-net45+win8\rosbridge_client_common.dll</HintPath>
     </Reference>
-    <Reference Include="RosbridgeNet.RosbridgeClient.ProtocolV2, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\RosbridgeNet.RosbridgeClient.ProtocolV2.1.2.0\lib\netstandard1.3\RosbridgeNet.RosbridgeClient.ProtocolV2.dll</HintPath>
-      <Private>True</Private>
+    <Reference Include="rosbridge_client_socket_for_desktop, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\rosbridge.client.desktop.1.0.0\lib\net45\rosbridge_client_socket_for_desktop.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
@@ -120,6 +118,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="TwinFlightController.cs" />
     <Compile Include="Twist.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>

@@ -1,16 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using System.Net.WebSockets;
 using System.Threading;
-using RosbridgeNet.RosbridgeClient.Common;
-using RosbridgeNet.RosbridgeClient.Common.Interfaces;
-using RosbridgeNet.RosbridgeClient.ProtocolV2;
-using RosbridgeNet.RosbridgeClient.ProtocolV2.Generics;
-using RosbridgeNet.RosbridgeClient.ProtocolV2.Generics.Interfaces;
 using Newtonsoft.Json.Linq;
+using Rosbridge.Client;
+using System.Windows.Threading;
+using Newtonsoft.Json;
+using System.Drawing;
 
 namespace KinectPoseRecognitionApp
 {
@@ -20,54 +15,80 @@ namespace KinectPoseRecognitionApp
     {
         public event EventHandler<FlightCameraVideoFrameReceivedArgs> CameraFrameReceived;
         public event EventHandler<FlightModeChangedArgs> FlightModeChanged;
-        string _connectionUri;
-        private bool _isConnected = false;
+        protected bool _isConnected = false;
         public bool isConnected { get { return _isConnected; } }
-        private FlightOperationMode _mode = FlightOperationMode.idle;
+        protected FlightOperationMode _mode = FlightOperationMode.idle;
         public FlightOperationMode mode {
             get
             {
                 return _mode;
             }
         }
-        private CancellationTokenSource _cts;
-        private IRosbridgeMessageDispatcher _md;
+        protected MessageDispatcher _md;
         private bool _isLanded = true;
-        public FlightController()
+        protected MainWindow _mw;
+        protected Subscriber _subscriber;
+        protected String _uavWSAddr;
+        protected bool switchingMode = false;
+        public FlightController(MainWindow mw, string uavWSAddr)
         {
+            _mw = mw;
+            _uavWSAddr = uavWSAddr;
+
         }
 
-        public void Connect(string conn)
+        public async virtual Task Connect()
         {
-            if (conn != null && conn.Length != 0 && !_isConnected)
+            if (isValidWSAddr(_uavWSAddr) && !_isConnected)
             {
-                _connectionUri = conn;
-                _cts = new CancellationTokenSource();
-                _md = Connect(new Uri(_connectionUri), _cts);
-                _isConnected = true;
-                Subscribe(_md);
+                try
+                {
+                    _md = new MessageDispatcher(new Socket(new Uri(_uavWSAddr)), new MessageSerializerV2_0());
+                    await _md.StartAsync();
+                    _subscriber = new Subscriber("/bebop/image_raw", "sensor_msgs/Image", _md);
+                    _subscriber.MessageReceived += _subscriber_MessageReceived;
+                    await _subscriber.SubscribeAsync();
+                    _isConnected = true;
+                    _mw.log("Success to connect the remote ros server");
+                }
+                catch (Exception ex)
+                {
+                    _mw.log("Error!! Could not connect to the rosbridge server");
+                    _md = null;
+                    throw ex;
+                }
             }
         }
 
-        public void Disconnect()
+        public virtual async Task Disconnect()
         {
             if (_isConnected)
             {
-                _cts.Cancel();
+                await _md.StopAsync();
+                _md = null;
                 _isConnected = false;
             }
         }
 
-        private void SwitchMode(FlightOperationMode newMode)
+        protected void SwitchMode(FlightOperationMode newMode)
         {
+            if (switchingMode)
+            {
+                return;
+            }
+
+            switchingMode = true;
+            _mode = newMode;
+            Thread.Sleep(3000);
+            switchingMode = false;
             FlightModeChangedArgs args = new FlightModeChangedArgs();
             args.from = _mode;
             args.to = newMode;
             FlightModeChanged.Invoke(this, args);
-            _mode = newMode;
+           
         }
 
-        public async void TranslateGestureToFlightOperation(GestureRecongizedArgs args)
+        public async virtual void TranslateGestureToFlightOperation(GestureRecongizedArgs args)
         {
             if (!_isConnected)
                 return;
@@ -95,7 +116,7 @@ namespace KinectPoseRecognitionApp
                 }
             }
 
-            if (args.rightHandGesture.leftRightGestureArgs == LeftRightGesture.Right)
+            if (args.rightHandGesture.forwardBackwardGestureArgs == ForwardBackwardGesture.Forward)
             {
                 if (_mode == FlightOperationMode.idle)
                     SwitchMode(FlightOperationMode.navigate);
@@ -105,6 +126,7 @@ namespace KinectPoseRecognitionApp
 
             if (_mode == FlightOperationMode.navigate)
             {
+
                 Twist twist = new Twist
                 {
                     angular = new Vector
@@ -123,11 +145,11 @@ namespace KinectPoseRecognitionApp
 
                 switch (args.leftHandGesture.forwardBackwardGestureArgs)
                 {
-                    case ForwardBackwardGesture.Backward:
-                        twist.linear.x = -1;
-                        break;
                     case ForwardBackwardGesture.Forward:
-                        twist.linear.x = -1;
+                        twist.linear.x = 0.1f;
+                        break;
+                    case ForwardBackwardGesture.Backward:
+                        twist.linear.x = -0.1f;
                         break;
                     case ForwardBackwardGesture.None:
                         twist.linear.x = 0;
@@ -136,10 +158,10 @@ namespace KinectPoseRecognitionApp
                 switch (args.leftHandGesture.upwardDownwardGestureArgs)
                 {
                     case UpwardDownwardGesture.Up:
-                        twist.linear.z = 1;
+                        twist.linear.z = 0.1f;
                         break;
                     case UpwardDownwardGesture.Down:
-                        twist.linear.z = -1;
+                        twist.linear.z = -0.1f;
                         break;
                     case UpwardDownwardGesture.None:
                         twist.linear.z = 0;
@@ -149,10 +171,10 @@ namespace KinectPoseRecognitionApp
                 switch (args.leftHandGesture.leftRightGestureArgs)
                 {
                     case LeftRightGesture.Left:
-                        twist.linear.y = 1;
+                        twist.linear.y = 0.1f;
                         break;
                     case LeftRightGesture.Right:
-                        twist.linear.y = -1;
+                        twist.linear.y = -0.1f;
                         break;
                     case LeftRightGesture.None:
                         twist.linear.y = 0;
@@ -162,10 +184,10 @@ namespace KinectPoseRecognitionApp
                 switch (args.rightHandGesture.leftRightGestureArgs)
                 {
                     case LeftRightGesture.Left:
-                        twist.angular.z = 1;
+                        twist.angular.z = 0.1f;
                         break;
                     case LeftRightGesture.Right:
-                        twist.angular.z = -1;
+                        twist.angular.z = -0.1f;
                         break;
                     case LeftRightGesture.None:
                         twist.linear.y = 0;
@@ -176,66 +198,73 @@ namespace KinectPoseRecognitionApp
             }
         }
 
-        private async Task takeOff() 
+        protected async Task takeOff() 
         {
             if (_isConnected)
             {
-                RosPublisher publisher = new RosPublisher(_md, "/bebop/takeoff", "std_msgs/Empty");
+                Publisher publisher = new Publisher("/bebop/takeoff", "std_msgs/String", _md);
                 await publisher.AdvertiseAsync();
                 var msg = JObject.Parse("{}");
                 await publisher.PublishAsync(msg);
+                await publisher.UnadvertiseAsync();
                 publisher = null;
             }
         }
 
-        private async Task landing()
+        protected async Task landing()
         {
             if (_isConnected)
             {
-                RosPublisher publisher = new RosPublisher(_md, "/bebop/land", "std_msgs/Empty");
+                Publisher publisher = new Publisher("/bebop/land", "std_msgs/Empty",_md);
                 await publisher.AdvertiseAsync();
                 var msg = JObject.Parse("{}");
                 await publisher.PublishAsync(msg);
+                await publisher.UnadvertiseAsync();
                 publisher = null;
             }
         }
 
-        private async Task navigate(Twist twist)
+        protected async Task navigate(Twist twist)
         {
 
             if (_isConnected)
             {
-                RosPublisher<Twist> publisher = new RosPublisher<Twist>(_md, "/bebop/cmd_vel");
+                Publisher publisher = new Publisher("/bebop/cmd_vel", "geometry_msgs/Twist",_md);
                 await publisher.AdvertiseAsync();
                 await publisher.PublishAsync(twist);
+                await publisher.UnadvertiseAsync();
                 publisher = null;
             }
         }
 
-        static void Subscribe(IRosbridgeMessageDispatcher messageDispatcher)
+        private void _subscriber_MessageReceived(object sender, MessageReceivedEventArgs e)
         {
-            RosSubscriber subscriber = new RosSubscriber(messageDispatcher, "/bebop/image_raw", "sensor_msgs/Image");
+            _mw.log(String.Format("[Message From Flight] image:{0} x {1}", e.Message["width"].ToString(), e.Message["height"].ToString()));
+            FlightCameraVideoFrameReceivedArgs args = new FlightCameraVideoFrameReceivedArgs();
+            args.data = e.Message["data"] != null ? e.Message["data"].ToObject<byte[]>() : null;
+            CameraFrameReceived.Invoke(this, args);
 
-            subscriber.RosMessageReceived += (s, e) => { Console.WriteLine(e.RosMessage); };
-
-            subscriber.SubscribeAsync();
         }
 
-        static IRosbridgeMessageDispatcher Connect(Uri webSocketAddress, CancellationTokenSource cancellationTokenSource)
+        public async Task ClearUp()
         {
-            ISocket socket = new Socket(new ClientWebSocket(), webSocketAddress, cancellationTokenSource);
-            IRosbridgeMessageSerializer messageSerializer = new RosbridgeMessageSerializer();
-            IRosbridgeMessageDispatcher messageDispatcher = new RosbridgeMessageDispatcher(socket, messageSerializer);
+            if (null != _subscriber)
+            {
+                _subscriber.MessageReceived -= _subscriber_MessageReceived;
+                await _subscriber.UnsubscribeAsync();
+                _subscriber = null;
+            }
+        }
 
-            messageDispatcher.StartAsync().Wait();
-
-            return messageDispatcher;
+        protected bool isValidWSAddr(string addr)
+        {
+            return addr != null && addr.Length != 0 && addr.StartsWith("ws://");
         }
     }
 
     public class FlightCameraVideoFrameReceivedArgs
     {
-        public Byte[] frame;
+        public byte[] data;
     }
 
     public class FlightModeChangedArgs

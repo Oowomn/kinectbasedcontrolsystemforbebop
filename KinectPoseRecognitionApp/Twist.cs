@@ -6,9 +6,6 @@ using System.Threading.Tasks;
 
 namespace KinectPoseRecognitionApp
 {
-    using RosbridgeNet.RosbridgeClient.Common.Attributes;
-
-    [RosMessageType("geometry_msgs/Twist")]
     public class Twist
     {
         public Vector linear { get; set; }
