@@ -118,6 +118,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Flight.cs" />
     <Compile Include="TwinFlightController.cs" />
     <Compile Include="Twist.cs" />
     <Page Include="MainWindow.xaml">

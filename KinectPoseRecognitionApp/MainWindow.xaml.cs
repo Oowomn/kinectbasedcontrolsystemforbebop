@@ -251,9 +251,17 @@ namespace KinectPoseRecognitionApp
             rhLeftRightGestureStatus.Text = e.rightHandGesture.leftRightGestureArgs.ToString();
             rhUpDownGestureStatus.Text = e.rightHandGesture.upwardDownwardGestureArgs.ToString();
 
-            if (_flightController != null && _flightController.isConnected)
+            if (_flightController != null)
             {
-                _flightController.TranslateGestureToFlightOperation(e);
+                try
+                {
+                    _flightController.TranslateGestureToFlightOperation(e);
+                }catch(Exception ex)
+                {
+                    log("Failed to translate gesture to command");
+                    log(ex.Message);
+                    
+                }
             }
 
         }

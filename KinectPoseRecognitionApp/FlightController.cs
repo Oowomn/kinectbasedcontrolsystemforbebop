@@ -10,51 +10,49 @@ using System.Drawing;
 namespace KinectPoseRecognitionApp
 {
     public enum FlightOperation { landing, takeOff, forward, backward, up, down, left, right, rotateLeft, rotateRight, none}
-    public enum FlightOperationMode { idle, navigate, landingOrTakingOff}
+    public enum FlightOperationMode { idle, navigate, landingOrTakingOff, notConnected}
     class FlightController
     {
         public event EventHandler<FlightCameraVideoFrameReceivedArgs> CameraFrameReceived;
         public event EventHandler<FlightModeChangedArgs> FlightModeChanged;
-        protected bool _isConnected = false;
-        public bool isConnected { get { return _isConnected; } }
-        protected FlightOperationMode _mode = FlightOperationMode.idle;
         public FlightOperationMode mode {
             get
             {
-                return _mode;
+                if (_uav == null)
+                {
+                    return FlightOperationMode.notConnected;
+                }
+                return _uav.mode;
             }
         }
-        protected MessageDispatcher _md;
-        private bool _isLanded = true;
+
         protected MainWindow _mw;
-        protected Subscriber _subscriber;
-        protected String _uavWSAddr;
-        protected bool switchingMode = false;
-        public FlightController(MainWindow mw, string uavWSAddr)
+        protected string _uavWSAddr;
+        protected Flight _uav;
+        public FlightController(MainWindow mw)
         {
             _mw = mw;
-            _uavWSAddr = uavWSAddr;
+        }
 
+        public void setUAVWSAddress(String addr)
+        {
+            _uavWSAddr = addr;
         }
 
         public async virtual Task Connect()
         {
-            if (isValidWSAddr(_uavWSAddr) && !_isConnected)
+            if (isValidWSAddr(_uavWSAddr) && _uav == null)
             {
                 try
                 {
-                    _md = new MessageDispatcher(new Socket(new Uri(_uavWSAddr)), new MessageSerializerV2_0());
-                    await _md.StartAsync();
-                    _subscriber = new Subscriber("/bebop/image_raw", "sensor_msgs/Image", _md);
-                    _subscriber.MessageReceived += _subscriber_MessageReceived;
-                    await _subscriber.SubscribeAsync();
-                    _isConnected = true;
+                    _uav = new Flight(_uavWSAddr);
+                    await _uav.Connect();
                     _mw.log("Success to connect the remote ros server");
                 }
                 catch (Exception ex)
                 {
                     _mw.log("Error!! Could not connect to the rosbridge server");
-                    _md = null;
+                    _uav = null;
                     throw ex;
                 }
             }
@@ -62,69 +60,77 @@ namespace KinectPoseRecognitionApp
 
         public virtual async Task Disconnect()
         {
-            if (_isConnected)
+            if (_uav != null && _uav.isLanded)
             {
-                await _md.StopAsync();
-                _md = null;
-                _isConnected = false;
+                await _uav.Disconnect();
             }
         }
 
-        protected void SwitchMode(FlightOperationMode newMode)
+        protected async Task SwitchMode(FlightOperationMode newMode, Flight u, int delay = 0)
         {
-            if (switchingMode)
+            if (u.isSwitchingMode)
             {
                 return;
             }
 
-            switchingMode = true;
-            _mode = newMode;
-            Thread.Sleep(3000);
-            switchingMode = false;
-            FlightModeChangedArgs args = new FlightModeChangedArgs();
-            args.from = _mode;
-            args.to = newMode;
-            FlightModeChanged.Invoke(this, args);
-           
+            if (u != null && u.isConnected)
+            {
+                u.isSwitchingMode = true;
+                FlightModeChangedArgs args = new FlightModeChangedArgs();
+                args.from = _uav.mode;
+                args.to = newMode;
+                _uav.mode = newMode;
+                if(delay > 0)
+                {
+                    await Task.Delay(delay);
+                }
+                u.isSwitchingMode = false;
+                FlightModeChanged.Invoke(this, args);
+            }
         }
 
         public async virtual void TranslateGestureToFlightOperation(GestureRecongizedArgs args)
         {
-            if (!_isConnected)
+            if (_uav == null || !_uav.isConnected)
                 return;
 
-            if (_mode == FlightOperationMode.landingOrTakingOff)
+            if (_uav.mode == FlightOperationMode.landingOrTakingOff) 
             {
                 return;
             }
 
-            if (_mode == FlightOperationMode.idle)
+
+            if (_uav.mode == FlightOperationMode.idle)
             {
-                if (args.rightHandGesture.upwardDownwardGestureArgs == UpwardDownwardGesture.Down && !_isLanded)
+                if (args.rightHandGesture.upwardDownwardGestureArgs == UpwardDownwardGesture.Down && !_uav.isLanded)
                 {
-                    SwitchMode(FlightOperationMode.landingOrTakingOff);
-                    await landing();
-                    _isLanded = true;
-                    SwitchMode(FlightOperationMode.idle);
+                    await SwitchMode(FlightOperationMode.landingOrTakingOff,_uav);
+                    await _uav.landing();
+                    _uav.isLanded = true;
+                    await SwitchMode(FlightOperationMode.idle, _uav);
                 }
-                else if (args.rightHandGesture.upwardDownwardGestureArgs == UpwardDownwardGesture.Up && _isLanded)
+                else if (args.rightHandGesture.upwardDownwardGestureArgs == UpwardDownwardGesture.Up && _uav.isLanded)
                 {
-                    SwitchMode(FlightOperationMode.landingOrTakingOff);
-                    await takeOff();
-                    _isLanded = false;
-                    SwitchMode(FlightOperationMode.idle);
+                    await SwitchMode(FlightOperationMode.landingOrTakingOff, _uav);
+                    await _uav.takeOff();
+                    _uav.isLanded = false;
+                    await SwitchMode(FlightOperationMode.idle, _uav);
                 }
             }
 
             if (args.rightHandGesture.forwardBackwardGestureArgs == ForwardBackwardGesture.Forward)
             {
-                if (_mode == FlightOperationMode.idle)
-                    SwitchMode(FlightOperationMode.navigate);
+                if (_uav.mode == FlightOperationMode.idle)
+                {
+                    await SwitchMode(FlightOperationMode.navigate, _uav,3000);
+                }
                 else
-                    SwitchMode(FlightOperationMode.idle);
+                {
+                    await SwitchMode(FlightOperationMode.idle, _uav, 3000);
+                }
             }
 
-            if (_mode == FlightOperationMode.navigate)
+            if (_uav.mode == FlightOperationMode.navigate && !_uav.isLanded)
             {
 
                 Twist twist = new Twist
@@ -194,46 +200,7 @@ namespace KinectPoseRecognitionApp
                         break;
                 }
 
-                await navigate(twist);
-            }
-        }
-
-        protected async Task takeOff() 
-        {
-            if (_isConnected)
-            {
-                Publisher publisher = new Publisher("/bebop/takeoff", "std_msgs/String", _md);
-                await publisher.AdvertiseAsync();
-                var msg = JObject.Parse("{}");
-                await publisher.PublishAsync(msg);
-                await publisher.UnadvertiseAsync();
-                publisher = null;
-            }
-        }
-
-        protected async Task landing()
-        {
-            if (_isConnected)
-            {
-                Publisher publisher = new Publisher("/bebop/land", "std_msgs/Empty",_md);
-                await publisher.AdvertiseAsync();
-                var msg = JObject.Parse("{}");
-                await publisher.PublishAsync(msg);
-                await publisher.UnadvertiseAsync();
-                publisher = null;
-            }
-        }
-
-        protected async Task navigate(Twist twist)
-        {
-
-            if (_isConnected)
-            {
-                Publisher publisher = new Publisher("/bebop/cmd_vel", "geometry_msgs/Twist",_md);
-                await publisher.AdvertiseAsync();
-                await publisher.PublishAsync(twist);
-                await publisher.UnadvertiseAsync();
-                publisher = null;
+                await _uav.navigate(twist);
             }
         }
 
@@ -243,17 +210,6 @@ namespace KinectPoseRecognitionApp
             FlightCameraVideoFrameReceivedArgs args = new FlightCameraVideoFrameReceivedArgs();
             args.data = e.Message["data"] != null ? e.Message["data"].ToObject<byte[]>() : null;
             CameraFrameReceived.Invoke(this, args);
-
-        }
-
-        public async Task ClearUp()
-        {
-            if (null != _subscriber)
-            {
-                _subscriber.MessageReceived -= _subscriber_MessageReceived;
-                await _subscriber.UnsubscribeAsync();
-                _subscriber = null;
-            }
         }
 
         protected bool isValidWSAddr(string addr)
