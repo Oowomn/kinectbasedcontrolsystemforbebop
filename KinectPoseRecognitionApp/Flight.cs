@@ -18,6 +18,7 @@ namespace KinectPoseRecognitionApp
         public bool isLanded = true;
         public bool isSwitchingMode = false;
         private String _addr;
+        private Publisher navigatePub;
         public bool isConnected
         {
             get
@@ -43,11 +44,11 @@ namespace KinectPoseRecognitionApp
         {
             if (md != null)
             {
-                Publisher publisher = new Publisher("/bebop/takeoff", "std_msgs/String", md);
+                Publisher publisher = new Publisher("/bebop/takeoff", "std_msgs/Empty", md);
                 await publisher.AdvertiseAsync();
                 var msg = JObject.Parse("{}");
                 await publisher.PublishAsync(msg);
-                await publisher.UnadvertiseAsync();
+                //await publisher.UnadvertiseAsync();
                 publisher = null;
             }
         }
@@ -60,21 +61,26 @@ namespace KinectPoseRecognitionApp
                 await publisher.AdvertiseAsync();
                 var msg = JObject.Parse("{}");
                 await publisher.PublishAsync(msg);
-                await publisher.UnadvertiseAsync();
+                //await publisher.UnadvertiseAsync();
                 publisher = null;
             }
         }
 
         public async Task navigate(Twist twist)
         {
-
             if (md != null)
             {
-                Publisher publisher = new Publisher("/bebop/cmd_vel", "geometry_msgs/Twist", md);
-                await publisher.AdvertiseAsync();
-                await publisher.PublishAsync(twist);
-                await publisher.UnadvertiseAsync();
-                publisher = null;
+                if(navigatePub == null)
+                {
+                    navigatePub = new Publisher("/bebop/cmd_vel", "geometry_msgs/Twist", md);
+                    await navigatePub.AdvertiseAsync();
+                }
+
+                //Publisher publisher = new Publisher("/bebop/cmd_vel", "geometry_msgs/Twist", md);
+                //await publisher.AdvertiseAsync();
+                await navigatePub.PublishAsync(twist);
+                //await navigatePub.UnadvertiseAsync();
+                //publisher = null;
             }
         }
 

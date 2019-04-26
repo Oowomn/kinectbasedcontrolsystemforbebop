@@ -15,6 +15,7 @@ using System.Windows.Shapes;
 using Microsoft.Kinect;
 using LightBuzz.Vitruvius;
 using System.Diagnostics;
+using System.IO;
 
 namespace KinectPoseRecognitionApp
 {
@@ -43,19 +44,6 @@ namespace KinectPoseRecognitionApp
         GestureDetector _gestureDetector;
         FlightController _flightController;
 
-        public String FlightStatus { get
-            {
-                if (_flightController != null && _flightController.isConnected)
-                {
-                    return _flightController.mode.ToString();
-                }
-                else
-                {
-                    return "Not connected";
-                
-                }
-            } }
-
         private double _leftThreshold = 0.15;
         public double leftThreshold
         {
@@ -74,7 +62,7 @@ namespace KinectPoseRecognitionApp
                 _rightThreshold = value; log("Right threshold updated to " + value); UpdateThreshold();
             }
         }
-        private double _upThreshold = 0.15;
+        private double _upThreshold = 0.1;
         public double upThreshold
         {
             get { return _upThreshold; }
@@ -83,7 +71,7 @@ namespace KinectPoseRecognitionApp
                 _upThreshold = value; log("Up threshold updated to " + value); UpdateThreshold();
             }
         }
-        private double _downThreshold = 0.1;
+        private double _downThreshold = 0.2;
         public double downThreshold
         {
             get { return _downThreshold; }
@@ -203,7 +191,7 @@ namespace KinectPoseRecognitionApp
             log("System Initiating");
             _sensor = KinectSensor.GetDefault();
             _sensor.IsAvailableChanged += _sensor_IsAvailableChanged;
-            _gestureDetector = new GestureDetector(0.15, 0.15, 0.1, 0.15, 0.15, 0.1);
+            _gestureDetector = new GestureDetector(leftThreshold, rightThreshold, upThreshold, downThreshold, forwardThreshold, backwardThreshold);
             _gestureDetector.GestureRecongized += _gestureDetector_GestureRecongized;
             //try
             //{
@@ -258,6 +246,7 @@ namespace KinectPoseRecognitionApp
                     _flightController.TranslateGestureToFlightOperation(e);
                 }catch(Exception ex)
                 {
+                    _flightController.emergency();
                     log("Failed to translate gesture to command");
                     log(ex.Message);
                     
@@ -330,7 +319,7 @@ namespace KinectPoseRecognitionApp
 
         private async void BtnConnect_Click(object sender, RoutedEventArgs e)
         {
-            if(_flightController != null && _flightController.isConnected)
+            if(_flightController != null && _flightController.mode != FlightOperationMode.notConnected)
             {
                 log("You should disconnect the previous connect before init a new connection");
                 return;
@@ -341,12 +330,15 @@ namespace KinectPoseRecognitionApp
                 {
                     if(_uav1Address.Length > 0 && _uav1Address.StartsWith("ws://"))
                     {
-                        _flightController = new FlightController(this, _uav1Address);
+                        _flightController = new FlightController(this);
+                        _flightController.setUAVWSAddress(_uav1Address);
                         try
                         {
+
                             btnConnect.IsEnabled = false;
                             flightStatus.Text = "Connecting...";
                             _flightController.FlightModeChanged += _flightController_FlightModeChanged;
+                            _flightController.CameraFrameReceived += _flightController_CameraFrameReceived;
                             await _flightController.Connect();
                             btnDisconnect.IsEnabled = true;
                         }
@@ -357,8 +349,8 @@ namespace KinectPoseRecognitionApp
                             if (_flightController != null)
                             {
                                 flightStatus.Text = "Not Connected";
-                                await _flightController.ClearUp();
                                 _flightController.FlightModeChanged -= _flightController_FlightModeChanged;
+                                _flightController.CameraFrameReceived -= _flightController_CameraFrameReceived;
                                 _flightController = null;
                                 btnConnect.IsEnabled = true;
                                 btnDisconnect.IsEnabled = false;
@@ -389,6 +381,34 @@ namespace KinectPoseRecognitionApp
             }
         }
 
+        private void _flightController_CameraFrameReceived(object sender, FlightCameraVideoFrameReceivedArgs e)
+        {
+            if(e.data != null)
+            {
+                BitmapImage img = new BitmapImage();
+                using (var ms = new MemoryStream(e.data))
+                {
+                    ms.Position = 0;
+                    img.BeginInit();
+                    img.CreateOptions = BitmapCreateOptions.PreservePixelFormat;
+                    img.CacheOption = BitmapCacheOption.OnLoad;
+                    img.UriSource = null;
+                    img.StreamSource = ms;
+                    img.EndInit();
+                }
+
+                camera.Source = img;
+            }
+            else
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    log("image is null");
+                });
+                
+            }
+        }
+
         private void _flightController_FlightModeChanged(object sender, FlightModeChangedArgs e)
         {
             flightStatus.Text = e.to.ToString();
@@ -396,7 +416,7 @@ namespace KinectPoseRecognitionApp
 
         private async void BtnDisconnect_Click(object sender, RoutedEventArgs e)
         {
-            if (_flightController != null && _flightController.isConnected)
+            if (_flightController != null)
             {
                 try
                 {

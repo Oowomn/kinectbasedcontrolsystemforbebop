@@ -6,6 +6,7 @@ using Rosbridge.Client;
 using System.Windows.Threading;
 using Newtonsoft.Json;
 using System.Drawing;
+using System.Linq;
 
 namespace KinectPoseRecognitionApp
 {
@@ -47,6 +48,8 @@ namespace KinectPoseRecognitionApp
                 {
                     _uav = new Flight(_uavWSAddr);
                     await _uav.Connect();
+                    //_uav.cameraFrameSubscriber.MessageReceived += _subscriber_MessageReceived;
+                    await SwitchMode(FlightOperationMode.idle, _uav);
                     _mw.log("Success to connect the remote ros server");
                 }
                 catch (Exception ex)
@@ -63,6 +66,7 @@ namespace KinectPoseRecognitionApp
             if (_uav != null && _uav.isLanded)
             {
                 await _uav.Disconnect();
+                _uav = null;
             }
         }
 
@@ -104,29 +108,43 @@ namespace KinectPoseRecognitionApp
             {
                 if (args.rightHandGesture.upwardDownwardGestureArgs == UpwardDownwardGesture.Down && !_uav.isLanded)
                 {
+                    _mw.log("islanding");
                     await SwitchMode(FlightOperationMode.landingOrTakingOff,_uav);
-                    await _uav.landing();
+                    try
+                    {
+                        await _uav.landing();
+                    }catch(Exception ex)
+                    {
+
+                    }
                     _uav.isLanded = true;
                     await SwitchMode(FlightOperationMode.idle, _uav);
                 }
                 else if (args.rightHandGesture.upwardDownwardGestureArgs == UpwardDownwardGesture.Up && _uav.isLanded)
                 {
+                    _mw.log("is takeoff");
                     await SwitchMode(FlightOperationMode.landingOrTakingOff, _uav);
-                    await _uav.takeOff();
+                    try
+                    {
+                        await _uav.takeOff();
+                    }catch(Exception ex)
+                    {
+
+                    }
                     _uav.isLanded = false;
                     await SwitchMode(FlightOperationMode.idle, _uav);
                 }
             }
 
-            if (args.rightHandGesture.forwardBackwardGestureArgs == ForwardBackwardGesture.Forward)
+            if (args.rightHandGesture.forwardBackwardGestureArgs == ForwardBackwardGesture.Forward && !_uav.isLanded)
             {
                 if (_uav.mode == FlightOperationMode.idle)
                 {
-                    await SwitchMode(FlightOperationMode.navigate, _uav,3000);
+                    await SwitchMode(FlightOperationMode.navigate, _uav,1000);
                 }
                 else
                 {
-                    await SwitchMode(FlightOperationMode.idle, _uav, 3000);
+                    await SwitchMode(FlightOperationMode.idle, _uav, 1000);
                 }
             }
 
@@ -152,10 +170,10 @@ namespace KinectPoseRecognitionApp
                 switch (args.leftHandGesture.forwardBackwardGestureArgs)
                 {
                     case ForwardBackwardGesture.Forward:
-                        twist.linear.x = 0.1f;
+                        twist.linear.x = 0.2f;
                         break;
                     case ForwardBackwardGesture.Backward:
-                        twist.linear.x = -0.1f;
+                        twist.linear.x = -0.2f;
                         break;
                     case ForwardBackwardGesture.None:
                         twist.linear.x = 0;
@@ -164,10 +182,10 @@ namespace KinectPoseRecognitionApp
                 switch (args.leftHandGesture.upwardDownwardGestureArgs)
                 {
                     case UpwardDownwardGesture.Up:
-                        twist.linear.z = 0.1f;
+                        twist.linear.z = 0.2f;
                         break;
                     case UpwardDownwardGesture.Down:
-                        twist.linear.z = -0.1f;
+                        twist.linear.z = -0.2f;
                         break;
                     case UpwardDownwardGesture.None:
                         twist.linear.z = 0;
@@ -177,10 +195,10 @@ namespace KinectPoseRecognitionApp
                 switch (args.leftHandGesture.leftRightGestureArgs)
                 {
                     case LeftRightGesture.Left:
-                        twist.linear.y = 0.1f;
+                        twist.linear.y = 0.2f;
                         break;
                     case LeftRightGesture.Right:
-                        twist.linear.y = -0.1f;
+                        twist.linear.y = -0.2f;
                         break;
                     case LeftRightGesture.None:
                         twist.linear.y = 0;
@@ -190,25 +208,32 @@ namespace KinectPoseRecognitionApp
                 switch (args.rightHandGesture.leftRightGestureArgs)
                 {
                     case LeftRightGesture.Left:
-                        twist.angular.z = 0.1f;
+                        twist.angular.z = 0.3f;
                         break;
                     case LeftRightGesture.Right:
-                        twist.angular.z = -0.1f;
+                        twist.angular.z = -0.3f;
                         break;
                     case LeftRightGesture.None:
                         twist.linear.y = 0;
                         break;
                 }
 
-                await _uav.navigate(twist);
+                try
+                {
+                    await _uav.navigate(twist);
+                }catch(Exception ex)
+                {
+
+                }
             }
         }
 
         private void _subscriber_MessageReceived(object sender, MessageReceivedEventArgs e)
         {
-            _mw.log(String.Format("[Message From Flight] image:{0} x {1}", e.Message["width"].ToString(), e.Message["height"].ToString()));
+            //_mw.log(String.Format("[Message From Flight] {0}", e.Message.ToString()));
             FlightCameraVideoFrameReceivedArgs args = new FlightCameraVideoFrameReceivedArgs();
-            args.data = e.Message["data"] != null ? e.Message["data"].ToObject<byte[]>() : null;
+            args.dataStr = e.Message["data"].ToString();
+            args.data = Convert.FromBase64String(e.Message["data"].ToString());//e.Message["data"] != null ? StringToByte(e.Message["data"].to) : null;
             CameraFrameReceived.Invoke(this, args);
         }
 
@@ -216,11 +241,43 @@ namespace KinectPoseRecognitionApp
         {
             return addr != null && addr.Length != 0 && addr.StartsWith("ws://");
         }
+
+        //public static byte[] StringToByte(string hex)
+        //{
+        //    int num = hex.Length;
+        //    byte[] bytes = new byte[num / 2];
+        //    for(int i=0;i<num; i += 2)
+        //    {
+        //        bytes[i / 2] = Convert.ToByte(hex.Substring(i, 2), 16);
+           
+        //    }
+        //    return bytes;
+        //}
+
+        //public static byte[] StringToByteArray(string hex)
+        //{
+        //    return Enumerable.Range(0, hex.Length)
+        //                     .Where(x => x % 2 == 0)
+        //                     .Select(x => Convert.ToByte(hex.Substring(x, 2), 16))
+        //                     .ToArray();
+        //}
+
+        public async void emergency()
+        {
+            if (_uav != null)
+            {
+                await _uav.takeOff();
+                _uav.isLanded = false;
+                await SwitchMode(FlightOperationMode.idle, _uav);
+            }
+        }
     }
+
 
     public class FlightCameraVideoFrameReceivedArgs
     {
         public byte[] data;
+        public string dataStr;
     }
 
     public class FlightModeChangedArgs

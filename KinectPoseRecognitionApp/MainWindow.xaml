@@ -87,6 +87,11 @@
                 </materialDesign:Card>
                 <materialDesign:Card Margin="2">
                     <StackPanel>
+                        <Image x:Name="camera" Margin="10 10" Width="600"/>
+                    </StackPanel>
+                </materialDesign:Card>
+                <materialDesign:Card Margin="2">
+                    <StackPanel Width="609">
                         <TextBlock
                             Grid.Row="0"
                             Margin="20 10"
@@ -96,6 +101,7 @@
                         </TextBlock>
                         <Separator Margin="10 0"/>
                         <TextBlock       
+                            FontSize="40"
                             Margin="20 10"
                             VerticalAlignment="Center"
                             HorizontalAlignment="Left"
@@ -105,7 +111,8 @@
                                  None
                             </Run>
                         </TextBlock>
-                        <TextBlock       
+                        <TextBlock    
+                            FontSize="40"
                             Margin="20 10"
                             VerticalAlignment="Center"
                             HorizontalAlignment="Left"
@@ -116,6 +123,7 @@
                             </Run>
                         </TextBlock>
                         <TextBlock       
+                            FontSize="40"
                             Margin="20 10"
                             VerticalAlignment="Center"
                             HorizontalAlignment="Left"
@@ -128,7 +136,7 @@
                     </StackPanel>
                 </materialDesign:Card>
                 <materialDesign:Card Margin="2">
-                    <StackPanel>
+                    <StackPanel Width="611">
                         <TextBlock
                             Grid.Row="0"
                             Margin="20 10"
@@ -137,7 +145,8 @@
                             Gesture Detection(Right Hand)
                         </TextBlock>
                         <Separator Margin="10 0"/>
-                        <TextBlock       
+                        <TextBlock    
+                            FontSize="40"
                             Margin="20 10"
                             VerticalAlignment="Center"
                             HorizontalAlignment="Left"
@@ -147,7 +156,8 @@
                                  None
                             </Run>
                         </TextBlock>
-                        <TextBlock       
+                        <TextBlock     
+                            FontSize="40"
                             Margin="20 10"
                             VerticalAlignment="Center"
                             HorizontalAlignment="Left"
@@ -157,7 +167,8 @@
                                  None
                             </Run>
                         </TextBlock>
-                        <TextBlock       
+                        <TextBlock    
+                            FontSize="40"
                             Margin="20 10"
                             VerticalAlignment="Center"
                             HorizontalAlignment="Left"
@@ -186,7 +197,7 @@
                             HorizontalAlignment="Center"
                             Style="{StaticResource MaterialDesignTitleTextBlock}"
                             >
-                            <Run Foreground="Yellow" x:Name="flightStatus" Text="{Binding FlightStatus,Mode=OneWay}" />
+                            <Run Foreground="Yellow" x:Name="flightStatus" Text="Not Connected" />
                         </TextBlock>
                         <ComboBox Margin="8" materialDesign:HintAssist.Hint="UAV Mode" x:Name="uavModeCombo"
                                   Style="{StaticResource MaterialDesignFloatingHintComboBox}" SelectedValue="{Binding uavMode,Mode=TwoWay}">
