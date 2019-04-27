@@ -266,8 +266,8 @@ namespace KinectPoseRecognitionApp
         {
             if (_uav != null)
             {
-                await _uav.takeOff();
-                _uav.isLanded = false;
+                await _uav.landing();
+                _uav.isLanded = true;
                 await SwitchMode(FlightOperationMode.idle, _uav);
             }
         }
